@@ -1,15 +1,16 @@
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
 import '../adapters/api_service.dart';
+import '../adapters/local_storage_service.dart';
 import '../models/product_model.dart';
 
 class CatalogController extends ChangeNotifier {
   final ApiService api;
+  final LocalStorageService localStorage;
 
-  CatalogController(this.api);
+  CatalogController(this.api, this.localStorage);
 
   Timer? _debounce;
 
@@ -70,31 +71,54 @@ class CatalogController extends ChangeNotifier {
     query = value;
     _debounce?.cancel();
 
-    _debounce = Timer(
-      const Duration(milliseconds: 300),
-      () => loadProducts(),
-    );
+    _debounce = Timer(const Duration(milliseconds: 300), () => loadProducts());
   }
 
-  // Carrega os produtos pela API.
+  // Carrega os produtos pela API ou pelo armazenamento local.
   Future<void> loadProducts() async {
     loading = true;
     error = null;
     notifyListeners();
 
     try {
-      products = await api.getProducts(query: query);
+      // Tenta carregar os produtos pela API.
+      final onlineProducts = await api.getProducts(query: query);
 
-      // Remove seleções de produtos que não existem mais
-      // na lista carregada.
+      products = onlineProducts;
+
+      // Atualiza o cache somente quando recebe o catálogo completo.
+      if (query.trim().isEmpty) {
+        await localStorage.saveProducts(onlineProducts);
+      }
+    } catch (e) {
+      // Se a API falhar, recupera os produtos salvos localmente.
+      try {
+        final cachedProducts = await localStorage.getProducts();
+
+        final normalizedQuery = query.trim().toLowerCase();
+
+        products = cachedProducts.where((product) {
+          return product.name.toLowerCase().contains(normalizedQuery) ||
+              product.category.toLowerCase().contains(normalizedQuery) ||
+              product.supplier.toLowerCase().contains(normalizedQuery);
+        }).toList();
+
+        if (cachedProducts.isEmpty) {
+          error =
+              'Sem conexão e ainda não há produtos salvos neste dispositivo.';
+        } else {
+          error = 'Você está offline. Exibindo os últimos produtos salvos.';
+        }
+      } catch (_) {
+        products = [];
+        error = 'Não foi possível carregar os produtos da API nem do armazenamento local.';
+      }
+    } finally {
+      // Remove seleções de produtos que não existem mais na lista.
       final availableIds = products.map((product) => product.id).toSet();
 
-      _selectedProductIds.removeWhere(
-        (id) => !availableIds.contains(id),
-      );
-    } catch (e) {
-      error = e.toString().replaceFirst('Exception: ', '');
-    } finally {
+      _selectedProductIds.removeWhere((id) => !availableIds.contains(id));
+
       loading = false;
       notifyListeners();
     }

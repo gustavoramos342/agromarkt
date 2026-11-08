@@ -1,26 +1,31 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'adapters/api_service.dart';
+import 'adapters/local_storage_service.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/catalog_controller.dart';
 import 'views/catalog_screen.dart';
 import 'views/login_screen.dart';
 import 'views/supplier_screen.dart';
 
-void main() {
-  final api = ApiService();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(AgroMarktApp(api: api));
+  final api = ApiService();
+  final localStorage = LocalStorageService();
+
+  runApp(AgroMarktApp(api: api, localStorage: localStorage));
 }
 
 class AgroMarktApp extends StatelessWidget {
   final ApiService api;
+  final LocalStorageService localStorage;
 
   const AgroMarktApp({
     super.key,
     required this.api,
+    required this.localStorage,
   });
 
   @override
@@ -28,11 +33,10 @@ class AgroMarktApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<ApiService>.value(value: api),
+        Provider<LocalStorageService>.value(value: localStorage),
+        ChangeNotifierProvider(create: (_) => AuthController(api)),
         ChangeNotifierProvider(
-          create: (_) => AuthController(api),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => CatalogController(api),
+          create: (_) => CatalogController(api, localStorage),
         ),
       ],
       child: MaterialApp(
@@ -40,13 +44,9 @@ class AgroMarktApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.green,
-          ),
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
           scaffoldBackgroundColor: const Color(0xFFF7F9F6),
-          appBarTheme: const AppBarTheme(
-            centerTitle: false,
-          ),
+          appBarTheme: const AppBarTheme(centerTitle: false),
           cardTheme: const CardThemeData(
             elevation: 1,
             margin: EdgeInsets.symmetric(vertical: 6),
@@ -72,19 +72,14 @@ class AgroMarktApp extends StatelessWidget {
             // Administrador ou perfil não reconhecido:
             // não concede acesso automático ao catálogo.
             return Scaffold(
-              appBar: AppBar(
-                title: const Text('Acesso restrito'),
-              ),
+              appBar: AppBar(title: const Text('Acesso restrito')),
               body: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.lock_outline,
-                        size: 48,
-                      ),
+                      const Icon(Icons.lock_outline, size: 48),
                       const SizedBox(height: 16),
                       const Text(
                         'Este perfil não possui uma tela disponível.',
