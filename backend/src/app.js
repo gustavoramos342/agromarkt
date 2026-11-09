@@ -12,16 +12,25 @@ const quoteRoutes = require('./routes/quote_routes');
 const app = express();
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    error: 'Limite de tentativas atingido. Tente novamente em 15 minutos.',
+  },
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
   limit: 5,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: {
-    error: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
+    error: 'Muitas tentativas de cadastro. Tente novamente em uma hora.',
   },
 });
-
 app.disable('x-powered-by');
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/register', registerLimiter);
 app.use(helmet());
 
 const allowedOrigins = (process.env.CORS_ORIGIN || '')

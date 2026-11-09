@@ -1,5 +1,5 @@
 const express = require('express');
-const { login } = require('../services/auth_service');
+const { login, register } = require('../services/auth_service');
 const {
   authenticateToken,
 } = require('../middleware/auth_middleware');
@@ -23,7 +23,23 @@ router.post('/login', async (req, res, next) => {
     return next(error);
   }
 });
+router.post('/register', async (req, res, next) => {
+  try {
+    const { name, email, password, role } = req.body || {};
 
+    const result = await register(name, email, password, role);
+
+    return res.status(201).json(result);
+  } catch (error) {
+    if ([400, 409].includes(error.status)) {
+      return res.status(error.status).json({
+        error: error.message,
+      });
+    }
+
+    return next(error);
+  }
+});
 router.get('/me', authenticateToken, async (req, res, next) => {
   try {
     const result = await pool.query(
