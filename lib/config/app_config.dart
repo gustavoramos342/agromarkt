@@ -6,7 +6,7 @@ class AppConfig {
 
   static const bool useMockProducts = bool.fromEnvironment(
     'USE_MOCK_PRODUCTS',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   static const String apiBaseUrl = String.fromEnvironment(
