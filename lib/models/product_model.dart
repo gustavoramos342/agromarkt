@@ -4,6 +4,7 @@ class ProductModel {
   final String category;
   final String unit;
   final double price;
+  final int supplierId;
   final String supplier;
   final String location;
 
@@ -13,6 +14,7 @@ class ProductModel {
     required this.category,
     required this.unit,
     required this.price,
+    required this.supplierId,
     required this.supplier,
     required this.location,
   });
@@ -26,6 +28,7 @@ class ProductModel {
       category: '${json['category'] ?? 'Geral'}',
       unit: '${json['unit'] ?? 'unidade'}',
       price: double.tryParse('${json['price']}') ?? 0.0,
+      supplierId: int.tryParse('${json['supplier_id']}') ?? 0,
       supplier: '${json['supplier'] ?? 'Fornecedor'}',
       location: '${json['location'] ?? ''}',
     );

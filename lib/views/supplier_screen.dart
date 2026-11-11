@@ -13,6 +13,7 @@ class SupplierScreen extends StatefulWidget {
 }
 
 class _SupplierScreenState extends State<SupplierScreen> {
+  Future<List<Map<String, dynamic>>>? _contactsFuture;
   Future<List<ProductModel>>? _offersFuture;
   Future<List<Map<String, dynamic>>>? _requestsFuture;
   Future<List<Map<String, dynamic>>>? _historyFuture;
@@ -49,10 +50,37 @@ class _SupplierScreenState extends State<SupplierScreen> {
         );
 
         _historyFuture ??= _loadSupplierHistory(token: token, userId: user.id);
+        _contactsFuture ??= _loadSupplierContacts(token: token);
       }
     }
   }
+  // ============================================================
+  // CARREGAMENTO DOS CONTATOS DO FORNECEDOR
+  // ============================================================
 
+  Future<List<Map<String, dynamic>>> _loadSupplierContacts({
+    required String token,
+  }) async {
+    return context.read<AuthController>().api.getSupplierContacts(token: token);
+  }
+
+  Future<void> _refreshContacts() async {
+    final token = context.read<AuthController>().user?.token;
+
+    if (token == null || token.isEmpty) return;
+
+    final future = _loadSupplierContacts(token: token);
+
+    setState(() {
+      _contactsFuture = future;
+    });
+
+    try {
+      await future;
+    } catch (_) {
+      // O erro será apresentado na seção de contatos.
+    }
+  }
   // ============================================================
   // CARREGAMENTO E CACHE DAS OFERTAS
   // ============================================================
@@ -228,6 +256,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
       _refreshOffers(),
       _refreshRequests(),
       _refreshHistory(),
+      _refreshContacts(),
     ]);
   }
 
@@ -521,6 +550,211 @@ class _SupplierScreenState extends State<SupplierScreen> {
             isEditing
                 ? 'Oferta atualizada com sucesso!'
                 : 'Oferta cadastrada com sucesso!',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  // ============================================================
+  // CADASTRO E EDIÇÃO DE CONTATOS
+  // ============================================================
+
+  Future<void> _showContactDialog({Map<String, dynamic>? contact}) async {
+    final auth = context.read<AuthController>();
+    final token = auth.user?.token;
+
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sessão inválida. Faça login novamente.')),
+      );
+      return;
+    }
+
+    final isEditing = contact != null;
+    final formKey = GlobalKey<FormState>();
+    final labelController = TextEditingController(
+      text: contact?['label']?.toString() ?? '',
+    );
+    final valueController = TextEditingController(
+      text: contact?['contact_value']?.toString() ?? '',
+    );
+
+    const contactTypes = {
+      'telefone': 'Telefone',
+      'whatsapp': 'WhatsApp',
+      'email': 'E-mail',
+      'site': 'Site',
+      'instagram': 'Instagram',
+      'outro': 'Outro',
+    };
+
+    String selectedType = contact?['contact_type']?.toString() ?? 'telefone';
+    bool saving = false;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> saveContact() async {
+              if (saving || !formKey.currentState!.validate()) return;
+
+              setDialogState(() => saving = true);
+
+              try {
+                if (isEditing) {
+                  await auth.api.updateSupplierContact(
+                    token: token,
+                    contactId: int.parse(contact['id'].toString()),
+                    contactType: selectedType,
+                    contactValue: valueController.text.trim(),
+                    label: labelController.text.trim(),
+                  );
+                } else {
+                  await auth.api.createSupplierContact(
+                    token: token,
+                    contactType: selectedType,
+                    contactValue: valueController.text.trim(),
+                    label: labelController.text.trim(),
+                  );
+                }
+
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(true);
+                }
+              } catch (error) {
+                if (dialogContext.mounted) {
+                  setDialogState(() => saving = false);
+
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Não foi possível salvar: $error'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: Text(isEditing ? 'Editar contato' : 'Adicionar contato'),
+              content: SizedBox(
+                width: 450,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedType,
+                          decoration: const InputDecoration(
+                            labelText: 'Tipo de contato',
+                            prefixIcon: Icon(Icons.contact_phone_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: contactTypes.entries.map((entry) {
+                            return DropdownMenuItem(
+                              value: entry.key,
+                              child: Text(entry.value),
+                            );
+                          }).toList(),
+                          onChanged: saving
+                              ? null
+                              : (value) {
+                                  if (value != null) {
+                                    setDialogState(() => selectedType = value);
+                                  }
+                                },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: labelController,
+                          decoration: const InputDecoration(
+                            labelText: 'Rótulo (opcional)',
+                            hintText: 'Ex.: Comercial, Atendimento',
+                            prefixIcon: Icon(Icons.label_outline),
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLength: 60,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: valueController,
+                          decoration: const InputDecoration(
+                            labelText: 'Contato',
+                            hintText: 'Informe telefone, e-mail ou endereço',
+                            prefixIcon: Icon(Icons.link),
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLength: 254,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Informe o contato.';
+                            }
+
+                            if (selectedType == 'email' &&
+                                !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                    .hasMatch(value.trim())) {
+                              return 'Informe um e-mail válido.';
+                            }
+
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton.icon(
+                  onPressed: saving ? null : saveContact,
+                  icon: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(
+                    saving
+                        ? 'Salvando...'
+                        : isEditing
+                        ? 'Salvar alterações'
+                        : 'Cadastrar contato',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    labelController.dispose();
+    valueController.dispose();
+
+    if (saved == true && mounted) {
+      await _refreshContacts();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEditing
+                ? 'Contato atualizado com sucesso!'
+                : 'Contato cadastrado com sucesso!',
           ),
           backgroundColor: Colors.green,
         ),
@@ -951,6 +1185,189 @@ class _SupplierScreenState extends State<SupplierScreen> {
   }
 
   // ============================================================
+  // EXIBIÇÃO E EXCLUSÃO DOS CONTATOS
+  // ============================================================
+
+  Future<void> _deleteContact(Map<String, dynamic> contact) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir contato'),
+        content: Text(
+          'Deseja realmente excluir "${contact['contact_value']}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final auth = context.read<AuthController>();
+    final token = auth.user?.token;
+
+    if (token == null || token.isEmpty) return;
+
+    try {
+      await auth.api.deleteSupplierContact(
+        token: token,
+        contactId: int.parse(contact['id'].toString()),
+      );
+
+      await _refreshContacts();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Contato excluído com sucesso.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao excluir contato: $error')),
+      );
+    }
+  }
+
+  Widget _buildContacts() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _contactsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 36),
+                const SizedBox(height: 8),
+                const Text(
+                  'Não foi possível carregar seus contatos.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _refreshContacts,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Tentar novamente'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final contacts = snapshot.data ?? [];
+
+        if (contacts.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.contact_phone_outlined,
+                  size: 42,
+                  color: Colors.grey,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Você ainda não cadastrou contatos.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        const contactLabels = {
+          'telefone': 'Telefone',
+          'whatsapp': 'WhatsApp',
+          'email': 'E-mail',
+          'site': 'Site',
+          'instagram': 'Instagram',
+          'outro': 'Outro',
+        };
+
+        const contactIcons = {
+          'telefone': Icons.phone,
+          'whatsapp': Icons.chat,
+          'email': Icons.email_outlined,
+          'site': Icons.language,
+          'instagram': Icons.camera_alt_outlined,
+          'outro': Icons.contact_page_outlined,
+        };
+
+        return Column(
+          children: contacts.map((contact) {
+            final type = (contact['contact_type'] ?? 'outro').toString();
+            final label = (contact['label'] ?? '').toString().trim();
+            final value = (contact['contact_value'] ?? '').toString();
+
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: ListTile(
+                leading: Icon(
+                  contactIcons[type] ?? Icons.contact_page_outlined,
+                  color: Colors.green,
+                ),
+                title: Text(
+                  label.isNotEmpty ? label : (contactLabels[type] ?? 'Contato'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(value),
+                isThreeLine: false,
+                trailing: PopupMenuButton<String>(
+                  tooltip: 'Opções do contato',
+                  onSelected: (action) {
+                    if (action == 'edit') {
+                      _showContactDialog(contact: contact);
+                    } else if (action == 'delete') {
+                      _deleteContact(contact);
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        leading: Icon(Icons.edit_outlined),
+                        title: Text('Editar'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_outline),
+                        title: Text('Excluir'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  // ============================================================
   // EXIBIÇÃO DAS OFERTAS
   // ============================================================
 
@@ -1274,6 +1691,48 @@ class _SupplierScreenState extends State<SupplierScreen> {
                               ),
                               const Divider(height: 1),
                               _buildRequests(),
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(
+                                          Icons.contact_phone_outlined,
+                                          color: Colors.green,
+                                        ),
+                                        title: const Text('Meus contatos'),
+                                        subtitle: const Text(
+                                          'Gerencie os canais pelos quais os '
+                                          'produtores podem falar com você.',
+                                        ),
+                                        trailing: IconButton(
+                                          tooltip: 'Atualizar contatos',
+                                          icon: const Icon(Icons.refresh),
+                                          onPressed: _refreshContacts,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        child: FilledButton.icon(
+                                          onPressed: () => _showContactDialog(),
+                                          icon: const Icon(Icons.add),
+                                          label: const Text(
+                                            'Adicionar contato',
+                                          ),
+                                        ),
+                                      ),
+                                      const Divider(height: 1),
+                                      _buildContacts(),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),

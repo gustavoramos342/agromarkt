@@ -446,6 +446,30 @@ class ApiService {
     return items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
 
+  /// Lista os contatos de um fornecedor para o produtor autenticado.
+  Future<List<Map<String, dynamic>>> getPublicSupplierContacts({
+    required String token,
+    required int supplierId,
+  }) async {
+    _validateToken(token);
+
+    final response = await _client
+        .get(
+          Uri.parse('${AppConfig.apiBaseUrl}/suppliers/$supplierId/contatos'),
+          headers: _authHeaders(token),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded['contacts'] as List<dynamic>;
+
+    return items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
   /// Lista as propostas recebidas para uma solicitação do produtor.
   Future<List<Map<String, dynamic>>> getQuoteProposals({
     required String token,
@@ -623,6 +647,126 @@ class ApiService {
 
     return items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
+
+  // ============================================================
+  // CONTATOS DO FORNECEDOR
+  // ============================================================
+
+  /// Lista os contatos do fornecedor autenticado.
+  Future<List<Map<String, dynamic>>> getSupplierContacts({
+    required String token,
+  }) async {
+    _validateToken(token);
+
+    final response = await _client
+        .get(
+          Uri.parse('${AppConfig.apiBaseUrl}/profile/fornecedor/contatos'),
+          headers: _authHeaders(token),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded['contacts'] as List<dynamic>;
+
+    return items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  /// Cadastra um contato do fornecedor.
+  Future<Map<String, dynamic>> createSupplierContact({
+    required String token,
+    required String contactType,
+    required String contactValue,
+    String label = '',
+  }) async {
+    _validateToken(token);
+
+    final response = await _client
+        .post(
+          Uri.parse('${AppConfig.apiBaseUrl}/profile/fornecedor/contatos'),
+          headers: _authHeaders(token),
+          body: jsonEncode({
+            'contact_type': contactType,
+            'contact_value': contactValue.trim(),
+            'label': label.trim(),
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 201) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return Map<String, dynamic>.from(decoded['contact'] as Map);
+  }
+
+  /// Atualiza um contato do fornecedor.
+  Future<Map<String, dynamic>> updateSupplierContact({
+    required String token,
+    required int contactId,
+    required String contactType,
+    required String contactValue,
+    String label = '',
+  }) async {
+    _validateToken(token);
+
+    if (contactId < 1) {
+      throw Exception('ID do contato inválido.');
+    }
+
+    final response = await _client
+        .put(
+          Uri.parse(
+            '${AppConfig.apiBaseUrl}/profile/fornecedor/contatos/$contactId',
+          ),
+          headers: _authHeaders(token),
+          body: jsonEncode({
+            'contact_type': contactType,
+            'contact_value': contactValue.trim(),
+            'label': label.trim(),
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return Map<String, dynamic>.from(decoded['contact'] as Map);
+  }
+
+  /// Exclui um contato do fornecedor.
+  Future<void> deleteSupplierContact({
+    required String token,
+    required int contactId,
+  }) async {
+    _validateToken(token);
+
+    if (contactId < 1) {
+      throw Exception('ID do contato inválido.');
+    }
+
+    final response = await _client
+        .delete(
+          Uri.parse(
+            '${AppConfig.apiBaseUrl}/profile/fornecedor/contatos/$contactId',
+          ),
+          headers: _authHeaders(token),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+  }
+
   // ============================================================
   // VALIDAÇÕES E UTILITÁRIOS
   // ============================================================

@@ -7,7 +7,10 @@ const { rateLimit } = require('express-rate-limit');
 const authRoutes = require('./routes/auth_routes');
 const profileRoutes = require('./routes/profile_routes');
 const productRoutes = require('./routes/product_routes');
+const publicSupplierContactRoutes = require('./routes/public_supplier_contact_routes');
 const quoteRoutes = require('./routes/quote_routes');
+const supplierContactRoutes = require('./routes/supplier_contact_routes');
+const adminRoutes = require('./routes/admin_routes');
 
 const app = express();
 const loginLimiter = rateLimit({
@@ -62,7 +65,10 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/suppliers', publicSupplierContactRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/profile/fornecedor/contatos', supplierContactRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

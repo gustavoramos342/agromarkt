@@ -71,13 +71,14 @@ router.get('/', async (req, res, next) => {
     const result = await pool.query(
       `
       SELECT
-        p.id,
-        p.name,
-        p.category,
-        p.unit,
-        p.price,
-        u.name AS supplier,
-        p.location
+  p.id,
+  p.name,
+  p.category,
+  p.unit,
+  p.price,
+  p.supplier_id,
+  u.name AS supplier,
+  p.location
       FROM products p
       INNER JOIN users u ON u.id = p.supplier_id
       WHERE p.is_active = TRUE

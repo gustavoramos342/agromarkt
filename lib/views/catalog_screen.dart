@@ -31,6 +31,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
   bool _loadingRequests = false;
   String? _requestError;
 
+
+  final Map<int, List<Map<String, dynamic>>> _supplierContacts = {};
+  final Set<int> _loadingSupplierContacts = {};
+  final Map<int, String> _supplierContactErrors = {};
+
   List<Map<String, dynamic>> _history = [];
   bool _loadingHistory = false;
   String? _historyError;
@@ -172,6 +177,98 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _loadSupplierContacts(int supplierId) async {
+    if (supplierId < 1 ||
+        _loadingSupplierContacts.contains(supplierId) ||
+        _supplierContacts.containsKey(supplierId)) {
+      return;
+    }
+
+    final token = _token;
+
+    if (token == null) {
+      setState(() {
+        _supplierContactErrors[supplierId] =
+            'Sessão expirada. Faça login novamente.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingSupplierContacts.add(supplierId);
+      _supplierContactErrors.remove(supplierId);
+    });
+
+    try {
+      final contacts = await context
+          .read<AuthController>()
+          .api
+          .getPublicSupplierContacts(token: token, supplierId: supplierId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _supplierContacts[supplierId] = contacts;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _supplierContactErrors[supplierId] = error.toString().replaceFirst(
+          'Exception: ',
+          '',
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingSupplierContacts.remove(supplierId);
+        });
+      }
+    }
+  }
+
+  void _showSupplierContacts(int supplierId, String supplierName) {
+    final error = _supplierContactErrors[supplierId];
+    final contacts = _supplierContacts[supplierId] ?? [];
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text('Contatos de $supplierName'),
+          content: SizedBox(
+            width: 400,
+            child: error != null
+                ? Text(error)
+                : contacts.isEmpty
+                ? const Text('Este fornecedor ainda não cadastrou contatos.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: contacts.map((contact) {
+                      final type = '${contact['contact_type'] ?? 'outro'}';
+                      final label = '${contact['label'] ?? ''}';
+                      final value = '${contact['contact_value'] ?? ''}';
+
+                      return ListTile(
+                        leading: const Icon(Icons.contact_phone_outlined),
+                        title: Text(label.isEmpty ? type : label),
+                        subtitle: Text(value),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Fechar'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1243,6 +1340,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                 },
                                 icon: const Icon(Icons.request_quote_outlined),
                               ),
+                              IconButton(
+  tooltip: 'Contatos do fornecedor',
+  visualDensity: VisualDensity.compact,
+  constraints: const BoxConstraints(),
+  padding: const EdgeInsets.all(5),
+  onPressed: () async {
+    final supplierId = product.supplierId;
+
+    await _loadSupplierContacts(supplierId);
+
+    if (!mounted) return;
+
+    _showSupplierContacts(supplierId, product.supplier);
+  },
+  icon: const Icon(Icons.contact_phone_outlined),
+),
                             ],
                           ),
                         ],
