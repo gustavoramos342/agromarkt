@@ -8,6 +8,10 @@ class AppConfig {
     'USE_MOCK_PRODUCTS',
     defaultValue: false,
   );
+  static const bool developerAdminEnabled = bool.fromEnvironment(
+    'AGROMARKT_DEV_ADMIN',
+    defaultValue: false,
+  );
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',

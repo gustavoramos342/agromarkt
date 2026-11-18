@@ -9,6 +9,7 @@ import '../controllers/auth_controller.dart';
 import '../controllers/catalog_controller.dart';
 import '../models/product_model.dart';
 import 'comparator_screen.dart';
+import '../utils/app_feedback.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -30,7 +31,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
   List<Map<String, dynamic>> _requests = [];
   bool _loadingRequests = false;
   String? _requestError;
-
 
   final Map<int, List<Map<String, dynamic>>> _supplierContacts = {};
   final Set<int> _loadingSupplierContacts = {};
@@ -317,12 +317,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
   void _showMessage(String message, {bool error = false}) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? Colors.red : Colors.green,
-      ),
-    );
+    if (error) {
+      AppFeedback.error(context, message);
+    } else {
+      AppFeedback.success(context, message);
+    }
   }
 
   Future<void> _loadRequests() async {
@@ -530,11 +529,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   saving = false;
                 });
 
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(
-                    content: Text('Não foi possível criar a cotação: $error'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppFeedback.error(
+                  dialogContext,
+                  'Não foi possível criar a cotação. ${AppFeedback.friendlyError(error)}',
                 );
               }
             }
@@ -929,7 +926,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       return true;
     } catch (error) {
       _showMessage(
-        'Não foi possível atualizar a proposta: $error',
+        'Não foi possível atualizar a proposta. ${AppFeedback.friendlyError(error)}',
         error: true,
       );
 
@@ -1255,9 +1252,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
             onRefresh: catalog.loadProducts,
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-              itemCount: catalog.sortedProducts.length,
+              itemCount: catalog.products.length,
               itemBuilder: (context, index) {
-                final product = catalog.sortedProducts[index];
+                final product = catalog.products[index];
                 final isCheapest = product.id == catalog.cheapestProduct?.id;
                 final selected = catalog.isSelected(product);
 
@@ -1341,21 +1338,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                 icon: const Icon(Icons.request_quote_outlined),
                               ),
                               IconButton(
-  tooltip: 'Contatos do fornecedor',
-  visualDensity: VisualDensity.compact,
-  constraints: const BoxConstraints(),
-  padding: const EdgeInsets.all(5),
-  onPressed: () async {
-    final supplierId = product.supplierId;
+                                tooltip: 'Contatos do fornecedor',
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(5),
+                                onPressed: () async {
+                                  final supplierId = product.supplierId;
 
-    await _loadSupplierContacts(supplierId);
+                                  await _loadSupplierContacts(supplierId);
 
-    if (!mounted) return;
+                                  if (!mounted) return;
 
-    _showSupplierContacts(supplierId, product.supplier);
-  },
-  icon: const Icon(Icons.contact_phone_outlined),
-),
+                                  _showSupplierContacts(
+                                    supplierId,
+                                    product.supplier,
+                                  );
+                                },
+                                icon: const Icon(Icons.contact_phone_outlined),
+                              ),
                             ],
                           ),
                         ],

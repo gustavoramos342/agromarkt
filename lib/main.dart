@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'config/app_config.dart';
+import 'views/admin_screen.dart';
+
 import 'adapters/api_service.dart';
 import 'adapters/local_storage_service.dart';
 import 'controllers/auth_controller.dart';
@@ -34,7 +37,9 @@ class AgroMarktApp extends StatelessWidget {
       providers: [
         Provider<ApiService>.value(value: api),
         Provider<LocalStorageService>.value(value: localStorage),
-        ChangeNotifierProvider(create: (_) => AuthController(api)),
+        ChangeNotifierProvider(
+          create: (_) => AuthController(api)..restoreSession(),
+        ),
         ChangeNotifierProvider(
           create: (_) => CatalogController(api, localStorage),
         ),
@@ -54,6 +59,13 @@ class AgroMarktApp extends StatelessWidget {
         ),
         home: Consumer<AuthController>(
           builder: (context, auth, _) {
+            // Aguarda a restauração da sessão salva.
+            if (auth.loading) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
             // Usuário não autenticado: tela de login.
             if (!auth.isAuthenticated) {
               return const LoginScreen();
@@ -70,6 +82,9 @@ class AgroMarktApp extends StatelessWidget {
             }
 
             // Administrador ou perfil não reconhecido:
+            if (auth.isAdmin && AppConfig.developerAdminEnabled) {
+              return const AdminScreen();
+            }
             // não concede acesso automático ao catálogo.
             return Scaffold(
               appBar: AppBar(title: const Text('Acesso restrito')),

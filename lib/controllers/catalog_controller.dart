@@ -23,10 +23,14 @@ class CatalogController extends ChangeNotifier {
   String? error;
   String query = '';
 
-  // Produtos ordenados pelo menor preço.
+  // Produtos com preço unitário calculável, ordenados do menor para o maior.
   List<ProductModel> get sortedProducts {
-    final result = List<ProductModel>.from(products);
-    result.sort((a, b) => a.unitPrice.compareTo(b.unitPrice));
+    final result = products
+        .where((product) => product.unitPrice != null)
+        .toList();
+
+    result.sort((a, b) => a.unitPrice!.compareTo(b.unitPrice!));
+
     return result;
   }
 

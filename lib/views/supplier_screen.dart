@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../adapters/local_storage_service.dart';
 import '../controllers/auth_controller.dart';
 import '../models/product_model.dart';
+import '../utils/app_feedback.dart';
 
 class SupplierScreen extends StatefulWidget {
   const SupplierScreen({super.key});
@@ -13,6 +14,7 @@ class SupplierScreen extends StatefulWidget {
 }
 
 class _SupplierScreenState extends State<SupplierScreen> {
+  int _selectedTab = 0;
   Future<List<Map<String, dynamic>>>? _contactsFuture;
   Future<List<ProductModel>>? _offersFuture;
   Future<List<Map<String, dynamic>>>? _requestsFuture;
@@ -286,9 +288,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
     final token = auth.user?.token;
 
     if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sessão inválida. Faça login novamente.')),
-      );
+      AppFeedback.error(context, 'Sua sessão expirou. Entre novamente.');
       return;
     }
 
@@ -301,6 +301,9 @@ class _SupplierScreenState extends State<SupplierScreen> {
     );
     final priceController = TextEditingController(
       text: product?.price.toStringAsFixed(2).replaceAll('.', ',') ?? '',
+    );
+    final packageQuantityController = TextEditingController(
+      text: product?.packageQuantity?.toString() ?? '',
     );
     final locationController = TextEditingController(
       text: product?.location ?? '',
@@ -323,7 +326,11 @@ class _SupplierScreenState extends State<SupplierScreen> {
                 priceController.text.trim().replaceAll(',', '.'),
               );
 
-              if (price == null) return;
+              final packageQuantity = double.tryParse(
+                packageQuantityController.text.trim().replaceAll(',', '.'),
+              );
+
+              if (price == null || packageQuantity == null) return;
 
               setDialogState(() {
                 saving = true;
@@ -332,6 +339,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
               try {
                 if (isEditing) {
                   await auth.api.updateProduct(
+                    packageQuantity: packageQuantity,
                     token: token,
                     id: product.id,
                     name: nameController.text.trim(),
@@ -342,6 +350,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
                   );
                 } else {
                   await auth.api.createProduct(
+                    packageQuantity: packageQuantity,
                     token: token,
                     name: nameController.text.trim(),
                     category: categoryController.text.trim(),
@@ -360,11 +369,9 @@ class _SupplierScreenState extends State<SupplierScreen> {
                     saving = false;
                   });
 
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Não foi possível salvar: $error'),
-                      backgroundColor: Colors.red,
-                    ),
+                  AppFeedback.error(
+                    dialogContext,
+                    'Não foi possível salvar a oferta. ${AppFeedback.friendlyError(error)}',
                   );
                 }
               }
@@ -450,8 +457,9 @@ class _SupplierScreenState extends State<SupplierScreen> {
                         TextFormField(
                           controller: priceController,
                           decoration: const InputDecoration(
-                            labelText: 'Preço',
+                            labelText: 'Preço total da embalagem',
                             hintText: 'Ex.: 125,50',
+                            helperText: 'O aplicativo calculará automaticamente o preço unitário.',
                             prefixText: 'R\$ ',
                             prefixIcon: Icon(Icons.attach_money),
                             border: OutlineInputBorder(),
@@ -476,6 +484,46 @@ class _SupplierScreenState extends State<SupplierScreen> {
                             if (!RegExp(r'^\d+([,.]\d{1,2})?$')
                                 .hasMatch(text)) {
                               return 'Use no máximo duas casas decimais.';
+                            }
+
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: packageQuantityController,
+                          decoration: InputDecoration(
+                            labelText:
+                                'Quantidade da embalagem ($selectedUnit)',
+                            hintText: selectedUnit == 'kg'
+                                ? 'Ex.: 50'
+                                : selectedUnit == 'L'
+                                ? 'Ex.: 20'
+                                : 'Ex.: 1',
+                            helperText: 'Informe quanto existe dentro de cada embalagem.',
+                            prefixIcon: const Icon(Icons.inventory_2_outlined),
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: (value) {
+                            final text = (value ?? '').trim();
+                            final quantity = double.tryParse(
+                              text.replaceAll(',', '.'),
+                            );
+
+                            if (quantity == null || !quantity.isFinite) {
+                              return 'Informe uma quantidade válida.';
+                            }
+
+                            if (quantity <= 0) {
+                              return 'A quantidade deve ser maior que zero.';
+                            }
+
+                            if (!RegExp(r'^\d+([,.]\d{1,3})?$')
+                                .hasMatch(text)) {
+                              return 'Use no máximo três casas decimais.';
                             }
 
                             return null;
@@ -538,21 +586,18 @@ class _SupplierScreenState extends State<SupplierScreen> {
     categoryController.dispose();
     priceController.dispose();
     locationController.dispose();
+    packageQuantityController.dispose();
 
     if (saved == true && mounted) {
       await _refreshOffers();
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isEditing
-                ? 'Oferta atualizada com sucesso!'
-                : 'Oferta cadastrada com sucesso!',
-          ),
-          backgroundColor: Colors.green,
-        ),
+      AppFeedback.success(
+        context,
+        isEditing
+            ? 'Oferta atualizada com sucesso!'
+            : 'Oferta cadastrada com sucesso!',
       );
     }
   }
@@ -566,9 +611,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
     final token = auth.user?.token;
 
     if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sessão inválida. Faça login novamente.')),
-      );
+      AppFeedback.error(context, 'Sua sessão expirou. Entre novamente.');
       return;
     }
 
@@ -629,11 +672,9 @@ class _SupplierScreenState extends State<SupplierScreen> {
                 if (dialogContext.mounted) {
                   setDialogState(() => saving = false);
 
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Não foi possível salvar: $error'),
-                      backgroundColor: Colors.red,
-                    ),
+                  AppFeedback.error(
+                    dialogContext,
+                    'Não foi possível salvar o contato. ${AppFeedback.friendlyError(error)}',
                   );
                 }
               }
@@ -749,15 +790,11 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isEditing
-                ? 'Contato atualizado com sucesso!'
-                : 'Contato cadastrado com sucesso!',
-          ),
-          backgroundColor: Colors.green,
-        ),
+      AppFeedback.success(
+        context,
+        isEditing
+            ? 'Contato atualizado com sucesso!'
+            : 'Contato cadastrado com sucesso!',
       );
     }
   }
@@ -798,9 +835,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
     final token = auth.user?.token;
 
     if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sessão inválida. Faça login novamente.')),
-      );
+      AppFeedback.error(context, 'Sua sessão expirou. Entre novamente.');
       return;
     }
 
@@ -813,20 +848,13 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Oferta excluída com sucesso!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      AppFeedback.success(context, 'Oferta excluída com sucesso!');
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Não foi possível excluir a oferta: $error'),
-          backgroundColor: Colors.red,
-        ),
+      AppFeedback.error(
+        context,
+        'Não foi possível excluir a oferta. ${AppFeedback.friendlyError(error)}',
       );
     }
   }
@@ -840,20 +868,14 @@ class _SupplierScreenState extends State<SupplierScreen> {
     final token = auth.user?.token;
 
     if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sessão inválida. Faça login novamente.')),
-      );
+      AppFeedback.error(context, 'Sua sessão expirou. Entre novamente.');
       return;
     }
 
     final requestId = int.tryParse('${request['id']}');
 
     if (requestId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível identificar a solicitação.'),
-        ),
-      );
+      AppFeedback.error(context, 'Não foi possível identificar a solicitação.');
       return;
     }
 
@@ -901,11 +923,9 @@ class _SupplierScreenState extends State<SupplierScreen> {
                   sending = false;
                 });
 
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(
-                    content: Text('Não foi possível enviar a proposta: $error'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppFeedback.error(
+                  dialogContext,
+                  'Não foi possível enviar a proposta. ${AppFeedback.friendlyError(error)}',
                 );
               }
             }
@@ -1023,12 +1043,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Proposta enviada com sucesso!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      AppFeedback.success(context, 'Proposta enviada com sucesso!');
     }
   }
 
@@ -1215,7 +1230,10 @@ class _SupplierScreenState extends State<SupplierScreen> {
     final auth = context.read<AuthController>();
     final token = auth.user?.token;
 
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      AppFeedback.error(context, 'Sua sessão expirou. Entre novamente.');
+      return;
+    }
 
     try {
       await auth.api.deleteSupplierContact(
@@ -1227,14 +1245,13 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contato excluído com sucesso.')),
-      );
+      AppFeedback.success(context, 'Contato excluído com sucesso.');
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao excluir contato: $error')),
+      AppFeedback.error(
+        context,
+        'Não foi possível excluir o contato. ${AppFeedback.friendlyError(error)}',
       );
     }
   }
@@ -1590,9 +1607,54 @@ class _SupplierScreenState extends State<SupplierScreen> {
     final auth = context.watch<AuthController>();
     final user = auth.user;
 
+    final sections = [
+      (
+        title: 'Minhas ofertas',
+        subtitle: 'Produtos cadastrados por você.',
+        icon: Icons.inventory_2_outlined,
+        refresh: _refreshOffers,
+        content: _buildOffers(),
+        action: FilledButton.icon(
+          onPressed: () => _showOfferDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Cadastrar nova oferta'),
+        ),
+      ),
+      (
+        title: 'Solicitações de cotação',
+        subtitle: 'Consulte pedidos e envie suas propostas.',
+        icon: Icons.request_quote_outlined,
+        refresh: _refreshRequests,
+        content: _buildRequests(),
+        action: const SizedBox.shrink(),
+      ),
+      (
+        title: 'Meus contatos',
+        subtitle: 'Gerencie os canais de atendimento aos produtores.',
+        icon: Icons.contact_phone_outlined,
+        refresh: _refreshContacts,
+        content: _buildContacts(),
+        action: FilledButton.icon(
+          onPressed: () => _showContactDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Adicionar contato'),
+        ),
+      ),
+      (
+        title: 'Histórico de ofertas',
+        subtitle: 'Consulte suas propostas e respectivos status.',
+        icon: Icons.history,
+        refresh: _refreshHistory,
+        content: _buildHistory(),
+        action: const SizedBox.shrink(),
+      ),
+    ];
+
+    final section = sections[_selectedTab];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AgroMarkt - Área do Fornecedor'),
+        title: const Text('AgroMarkt - Fornecedor'),
         actions: [
           IconButton(
             tooltip: 'Atualizar tudo',
@@ -1610,23 +1672,22 @@ class _SupplierScreenState extends State<SupplierScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                const Icon(Icons.storefront, size: 64, color: Colors.green),
-                const SizedBox(height: 16),
+                const Icon(Icons.storefront, size: 42, color: Colors.green),
+                const SizedBox(height: 8),
                 const Text(
                   'Área do Fornecedor',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   'Bem-vindo${user?.name.isNotEmpty == true ? ', ${user!.name}' : ''}!',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 Expanded(
                   child: ListView(
                     children: [
@@ -1637,130 +1698,29 @@ class _SupplierScreenState extends State<SupplierScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ListTile(
-                                leading: const Icon(
-                                  Icons.inventory_2_outlined,
+                                leading: Icon(
+                                  section.icon,
                                   color: Colors.green,
                                 ),
-                                title: const Text('Minhas ofertas'),
-                                subtitle: const Text(
-                                  'Produtos cadastrados por você.',
-                                ),
+                                title: Text(section.title),
+                                subtitle: Text(section.subtitle),
                                 trailing: IconButton(
-                                  tooltip: 'Atualizar ofertas',
+                                  tooltip: 'Atualizar seção',
                                   icon: const Icon(Icons.refresh),
-                                  onPressed: _refreshOffers,
+                                  onPressed: section.refresh,
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                child: FilledButton.icon(
-                                  onPressed: () => _showOfferDialog(),
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Cadastrar nova oferta'),
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              _buildOffers(),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ListTile(
-                                leading: const Icon(
-                                  Icons.request_quote_outlined,
-                                  color: Colors.green,
-                                ),
-                                title: const Text('Solicitações de cotação'),
-                                subtitle: const Text(
-                                  'Consulte pedidos e envie suas propostas.',
-                                ),
-                                trailing: IconButton(
-                                  tooltip: 'Atualizar solicitações',
-                                  icon: const Icon(Icons.refresh),
-                                  onPressed: _refreshRequests,
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              _buildRequests(),
-                              Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      ListTile(
-                                        leading: const Icon(
-                                          Icons.contact_phone_outlined,
-                                          color: Colors.green,
-                                        ),
-                                        title: const Text('Meus contatos'),
-                                        subtitle: const Text(
-                                          'Gerencie os canais pelos quais os '
-                                          'produtores podem falar com você.',
-                                        ),
-                                        trailing: IconButton(
-                                          tooltip: 'Atualizar contatos',
-                                          icon: const Icon(Icons.refresh),
-                                          onPressed: _refreshContacts,
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        child: FilledButton.icon(
-                                          onPressed: () => _showContactDialog(),
-                                          icon: const Icon(Icons.add),
-                                          label: const Text(
-                                            'Adicionar contato',
-                                          ),
-                                        ),
-                                      ),
-                                      const Divider(height: 1),
-                                      _buildContacts(),
-                                    ],
+                              if (_selectedTab == 0 || _selectedTab == 2) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
                                   ),
+                                  child: section.action,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ListTile(
-                                leading: const Icon(
-                                  Icons.history,
-                                  color: Colors.green,
-                                ),
-                                title: const Text('Histórico de ofertas'),
-                                subtitle: const Text(
-                                  'Consulte as propostas que você já enviou '
-                                  'e seus respectivos status.',
-                                ),
-                                trailing: IconButton(
-                                  tooltip: 'Atualizar histórico',
-                                  icon: const Icon(Icons.refresh),
-                                  onPressed: _refreshHistory,
-                                ),
-                              ),
+                              ],
                               const Divider(height: 1),
-                              _buildHistory(),
+                              section.content,
                             ],
                           ),
                         ),
@@ -1772,6 +1732,36 @@ class _SupplierScreenState extends State<SupplierScreen> {
             ),
           ),
         ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedTab = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2),
+            label: 'Ofertas',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.request_quote_outlined),
+            selectedIcon: Icon(Icons.request_quote),
+            label: 'Cotações',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.contact_phone_outlined),
+            selectedIcon: Icon(Icons.contact_phone),
+            label: 'Contatos',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history),
+            selectedIcon: Icon(Icons.history),
+            label: 'Histórico',
+          ),
+        ],
       ),
     );
   }

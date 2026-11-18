@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/user_model.dart';
+import '../utils/app_feedback.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -68,16 +69,12 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            auth.error ??
-                (_isRegisterMode
-                    ? 'Não foi possível criar sua conta.'
-                    : 'Falha no login. Verifique seus dados.'),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppFeedback.error(
+        context,
+        auth.error ??
+            (_isRegisterMode
+                ? 'Não foi possível criar sua conta.'
+                : 'Falha no login. Verifique seus dados.'),
       );
     }
   }

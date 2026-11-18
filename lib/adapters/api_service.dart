@@ -127,6 +127,33 @@ class ApiService {
     return UserModel.fromJson(data);
   }
 
+  /// Recupera o usuário autenticado e valida o JWT salvo.
+  Future<UserModel> getCurrentUser(String token) async {
+    _validateToken(token);
+
+    if (AppConfig.useMockAuth) {
+      throw Exception('Restauração de sessão indisponível no modo demo.');
+    }
+
+    final response = await _client
+        .get(
+          Uri.parse('${AppConfig.apiBaseUrl}/auth/me'),
+          headers: _authHeaders(token),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return UserModel.fromJson({
+      ...data['user'] as Map<String, dynamic>,
+      'token': token,
+    });
+  }
+
   /// Cadastra um novo produtor ou fornecedor na API.
   Future<UserModel> register({
     required String name,
@@ -261,6 +288,7 @@ class ApiService {
     required String category,
     required String unit,
     required double price,
+    required double packageQuantity,
     required String location,
   }) async {
     _validateProductInput(
@@ -269,6 +297,7 @@ class ApiService {
       category: category,
       unit: unit,
       price: price,
+      packageQuantity: packageQuantity,
       location: location,
     );
 
@@ -281,6 +310,7 @@ class ApiService {
             'category': category.trim(),
             'unit': unit,
             'price': price,
+            'package_quantity': packageQuantity,
             'location': location.trim(),
           }),
         )
@@ -304,6 +334,7 @@ class ApiService {
     required String category,
     required String unit,
     required double price,
+    required double packageQuantity,
     required String location,
   }) async {
     _validateToken(token);
@@ -318,6 +349,7 @@ class ApiService {
       category: category,
       unit: unit,
       price: price,
+      packageQuantity: packageQuantity,
       location: location,
     );
 
@@ -330,6 +362,7 @@ class ApiService {
             'category': category.trim(),
             'unit': unit,
             'price': price,
+            'package_quantity': packageQuantity,
             'location': location.trim(),
           }),
         )
@@ -768,6 +801,95 @@ class ApiService {
   }
 
   // ============================================================
+  // ADMINISTRAÇÃO
+  // ============================================================
+
+  /// Lista os usuários cadastrados (acesso exclusivo para Admin).
+  Future<List<Map<String, dynamic>>> getAdminUsers({
+    required String token,
+  }) async {
+    _validateToken(token);
+
+    final response = await _client
+        .get(
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/users'),
+          headers: _authHeaders(token),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded['users'] as List<dynamic>;
+
+    return items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  /// Ativa ou desativa um usuário (acesso exclusivo para Admin).
+  Future<Map<String, dynamic>> updateAdminUserStatus({
+    required String token,
+    required int id,
+    required bool isActive,
+  }) async {
+    _validateToken(token);
+
+    if (id < 1) {
+      throw Exception('ID do usuário inválido.');
+    }
+
+    final response = await _client
+        .patch(
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$id/status'),
+          headers: _authHeaders(token),
+          body: jsonEncode({'is_active': isActive}),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return Map<String, dynamic>.from(decoded['user'] as Map);
+  }
+
+  /// Altera o perfil de um usuário entre produtor e fornecedor.
+  Future<Map<String, dynamic>> updateAdminUserRole({
+    required String token,
+    required int id,
+    required String role,
+  }) async {
+    _validateToken(token);
+
+    if (id < 1) {
+      throw Exception('ID do usuário inválido.');
+    }
+
+    if (!['produtor', 'fornecedor'].contains(role)) {
+      throw Exception('Perfil inválido.');
+    }
+
+    final response = await _client
+        .patch(
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$id/role'),
+          headers: _authHeaders(token),
+          body: jsonEncode({'role': role}),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response));
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return Map<String, dynamic>.from(decoded['user'] as Map);
+  }
+
+  // ============================================================
   // VALIDAÇÕES E UTILITÁRIOS
   // ============================================================
 
@@ -789,6 +911,7 @@ class ApiService {
     required String category,
     required String unit,
     required double price,
+    required double packageQuantity,
     required String location,
   }) {
     _validateToken(token);
@@ -799,7 +922,9 @@ class ApiService {
         category.trim().length > 80 ||
         location.trim().length > 180 ||
         price < 0 ||
-        !price.isFinite) {
+        !price.isFinite ||
+        !packageQuantity.isFinite ||
+        packageQuantity <= 0) {
       throw Exception('Confira os dados informados para o produto.');
     }
 
@@ -807,10 +932,20 @@ class ApiService {
       throw Exception('Unidade de medida inválida.');
     }
 
-    final formattedPrice = price.toStringAsFixed(2);
+    // Preço: máximo de duas casas decimais.
+    final priceScaled = price * 100;
 
-    if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(formattedPrice)) {
+    if ((priceScaled - priceScaled.round()).abs() > 0.000001) {
       throw Exception('O preço deve ter até duas casas decimais.');
+    }
+
+    // Quantidade da embalagem: máximo de três casas decimais.
+    final quantityScaled = packageQuantity * 1000;
+
+    if ((quantityScaled - quantityScaled.round()).abs() > 0.000001) {
+      throw Exception(
+        'A quantidade da embalagem deve ter até três casas decimais.',
+      );
     }
   }
 

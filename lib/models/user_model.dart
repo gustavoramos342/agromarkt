@@ -20,9 +20,7 @@ class UserModel {
         ? Map<String, dynamic>.from(json['user'] as Map)
         : json;
 
-    final roleName = (userData['role'] ?? 'produtor')
-        .toString()
-        .toLowerCase();
+    final roleName = (userData['role'] ?? 'produtor').toString().toLowerCase();
 
     final role = UserRole.values.firstWhere(
       (item) => item.name == roleName,

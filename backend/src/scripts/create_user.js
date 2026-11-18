@@ -70,12 +70,20 @@ async function main() {
   try {
     const name = await ask('Nome: ');
     const email = (await ask('E-mail: ')).toLowerCase();
-    const role = (await ask('Perfil (produtor/fornecedor): ')).toLowerCase();
+        const allowAdmin = process.env.ALLOW_ADMIN_BOOTSTRAP === 'true';
+
+    const allowedRoles = allowAdmin
+      ? ['produtor', 'fornecedor', 'admin']
+      : ['produtor', 'fornecedor'];
+
+    const role = (
+      await ask(`Perfil (${allowedRoles.join('/')}): `)
+    ).toLowerCase();
 
     if (
       !name ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      !['produtor', 'fornecedor'].includes(role)
+     !allowedRoles.includes(role)
     ) {
       throw new Error('Nome, e-mail ou perfil inválido.');
     }

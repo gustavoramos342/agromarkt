@@ -17,6 +17,7 @@ function validateProduct(data) {
     category,
     unit,
     price,
+    package_quantity,
     location = '',
   } = data || {};
 
@@ -48,7 +49,23 @@ function validateProduct(data) {
     !/^\d+(\.\d{1,2})?$/.test(String(price).trim())
   ) {
     return {
-      error: 'O preço deve ser um número não negativo com até duas casas decimais.',
+      error: 'O preço total da embalagem deve ter até duas casas decimais e não pode ser negativo.',
+    };
+  }
+
+  const numericPackageQuantity =
+    typeof package_quantity === 'number' ||
+    typeof package_quantity === 'string'
+      ? Number(package_quantity)
+      : NaN;
+
+  if (
+    !Number.isFinite(numericPackageQuantity) ||
+    numericPackageQuantity <= 0 ||
+    !/^\d+(\.\d{1,3})?$/.test(String(package_quantity).trim())
+  ) {
+    return {
+      error: 'Informe uma quantidade de embalagem maior que zero, com até três casas decimais.',
     };
   }
 
@@ -58,8 +75,22 @@ function validateProduct(data) {
       category: category.trim(),
       unit,
       price: numericPrice,
+      package_quantity: numericPackageQuantity,
       location: location.trim(),
     },
+  };
+}
+
+// Converte os valores numéricos retornados pelo PostgreSQL.
+function formatProduct(product) {
+  return {
+    ...product,
+    id: Number(product.id),
+    price: Number(product.price),
+    package_quantity:
+      product.package_quantity == null
+        ? null
+        : Number(product.package_quantity),
   };
 }
 
@@ -71,14 +102,15 @@ router.get('/', async (req, res, next) => {
     const result = await pool.query(
       `
       SELECT
-  p.id,
-  p.name,
-  p.category,
-  p.unit,
-  p.price,
-  p.supplier_id,
-  u.name AS supplier,
-  p.location
+        p.id,
+        p.name,
+        p.category,
+        p.unit,
+        p.price,
+        p.package_quantity,
+        p.supplier_id,
+        u.name AS supplier,
+        p.location
       FROM products p
       INNER JOIN users u ON u.id = p.supplier_id
       WHERE p.is_active = TRUE
@@ -98,11 +130,7 @@ router.get('/', async (req, res, next) => {
     );
 
     return res.status(200).json({
-      products: result.rows.map((product) => ({
-        ...product,
-        id: Number(product.id),
-        price: Number(product.price),
-      })),
+      products: result.rows.map(formatProduct),
     });
   } catch (error) {
     return next(error);
@@ -124,6 +152,7 @@ router.get(
           category,
           unit,
           price,
+          package_quantity,
           location,
           created_at,
           updated_at
@@ -136,11 +165,7 @@ router.get(
       );
 
       return res.status(200).json({
-        products: result.rows.map((product) => ({
-          ...product,
-          id: Number(product.id),
-          price: Number(product.price),
-        })),
+        products: result.rows.map(formatProduct),
       });
     } catch (error) {
       return next(error);
@@ -168,35 +193,33 @@ router.post(
         category,
         unit,
         price,
+        package_quantity,
         location,
       } = validation.value;
 
       const result = await pool.query(
         `
         INSERT INTO products
-          (name, category, unit, price, supplier_id, location)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, name, category, unit, price, location
+          (name, category, unit, price, package_quantity, supplier_id, location)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING
+          id, name, category, unit, price,
+          package_quantity, location
         `,
         [
           name,
           category,
           unit,
           price,
+          package_quantity,
           req.user.id,
           location,
         ],
       );
 
-      const product = result.rows[0];
-
       return res.status(201).json({
         message: 'Produto cadastrado com sucesso.',
-        product: {
-          ...product,
-          id: Number(product.id),
-          price: Number(product.price),
-        },
+        product: formatProduct(result.rows[0]),
       });
     } catch (error) {
       return next(error);
@@ -232,6 +255,7 @@ router.put(
         category,
         unit,
         price,
+        package_quantity,
         location,
       } = validation.value;
 
@@ -243,18 +267,22 @@ router.put(
           category = $2,
           unit = $3,
           price = $4,
-          location = $5,
+          package_quantity = $5,
+          location = $6,
           updated_at = NOW()
-        WHERE id = $6
-          AND supplier_id = $7
+        WHERE id = $7
+          AND supplier_id = $8
           AND is_active = TRUE
-        RETURNING id, name, category, unit, price, location
+        RETURNING
+          id, name, category, unit, price,
+          package_quantity, location
         `,
         [
           name,
           category,
           unit,
           price,
+          package_quantity,
           location,
           id,
           req.user.id,
@@ -267,15 +295,9 @@ router.put(
         });
       }
 
-      const product = result.rows[0];
-
       return res.status(200).json({
         message: 'Produto atualizado com sucesso.',
-        product: {
-          ...product,
-          id: Number(product.id),
-          price: Number(product.price),
-        },
+        product: formatProduct(result.rows[0]),
       });
     } catch (error) {
       return next(error);
