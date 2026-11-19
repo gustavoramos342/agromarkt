@@ -1,10 +1,10 @@
-AgroMarkt
+##  AgroMarkt
 
-**Comparador de Insumos e Fertilizantes Agrícolas**
+## Comparador de Insumos e Fertilizantes Agrícolas
 
 O AgroMarkt é uma plataforma desenvolvida para facilitar a pesquisa, comparação de preços e solicitação de cotações de insumos agrícolas, conectando produtores rurais e fornecedores.
 
-Acesse o sistema
+## Acesse o sistema
 
 Aplicação online:** https://agromarkt-web.onrender.com/
 
@@ -20,20 +20,20 @@ Acesse pelo navegador, tanto no computador quanto no celular.
 - Solicitar cotações aos fornecedores.
 - Acompanhar solicitações e consultar históricos.
 
-### 🏪 Fornecedor
+### Fornecedor
 - Cadastrar produtos.
 - Editar e gerenciar produtos.
 - Cadastrar e administrar ofertas.
 - Consultar informações comerciais.
 - Acompanhar registros e históricos de ofertas.
 
-### 🔐 Administrador
+### Administrador
 - Acessar o painel administrativo.
 - Gerenciar funcionalidades da plataforma.
 - Administrar usuários e permissões.
 - Acompanhar informações do sistema.
 
-## 📖 Como utilizar
+## Como utilizar
 
 1. Acesse https://agromarkt-web.onrender.com/.
 2. Entre na aplicação utilizando seu usuário e senha.
@@ -59,7 +59,7 @@ Acesse pelo navegador, tanto no computador quanto no celular.
 2. Consulte as funcionalidades de gerenciamento.
 3. Administre os recursos disponíveis conforme suas permissões.
 
-## 🛠️ Tecnologias utilizadas
+## Tecnologias utilizadas
 
 | Tecnologia | Utilização |
 |---|---|
@@ -72,7 +72,7 @@ Acesse pelo navegador, tanto no computador quanto no celular.
 | Neon | Hospedagem do banco de dados |
 | Render | Hospedagem da aplicação e API |
 
-## 🏗️ Estrutura do projeto
+## Estrutura do projeto
 
 ```text
 AgroMarkt/
@@ -89,23 +89,15 @@ AgroMarkt/
 └── README.md
 ```
 
-## 📱 Disponibilidade
+## Disponibilidade
 
 - Acesso pelo navegador.
 - Interface adaptada para computadores e celulares.
 - Algumas funcionalidades disponíveis offline.
 
-## 🎓 Projeto acadêmico
+## Projeto acadêmico
 
 Desenvolvido como projeto acadêmico do curso de **Bacharelado em Ciência da Computação**, da Universidade do Estado de Mato Grosso (UNEMAT).
 
 **Versão:** 1.0.0  
 **Tipo:** MVP — Produto Mínimo Viável
-
----
-
-<p align="center">
-
-🌱 **AgroMarkt — Facilitando decisões no agronegócio.**
-
-</p>
