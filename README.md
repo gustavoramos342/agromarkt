@@ -1,18 +1,18 @@
-# 🌱 AgroMarkt
+AgroMarkt
 
 **Comparador de Insumos e Fertilizantes Agrícolas**
 
 O AgroMarkt é uma plataforma desenvolvida para facilitar a pesquisa, comparação de preços e solicitação de cotações de insumos agrícolas, conectando produtores rurais e fornecedores.
 
-## 🚀 Acesse o sistema
+Acesse o sistema
 
-**Aplicação online:** https://agromarkt-web.onrender.com/
+Aplicação online:** https://agromarkt-web.onrender.com/
 
 Acesse pelo navegador, tanto no computador quanto no celular.
 
-## ✨ Funcionalidades
+## Funcionalidades
 
-### 🌱 Produtor
+### Produtor
 - Consultar o catálogo de produtos agrícolas.
 - Pesquisar fertilizantes, insumos e defensivos.
 - Comparar preços entre produtos.
