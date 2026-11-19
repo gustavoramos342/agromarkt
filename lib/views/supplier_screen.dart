@@ -56,6 +56,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
       }
     }
   }
+
   // ============================================================
   // CARREGAMENTO DOS CONTATOS DO FORNECEDOR
   // ============================================================
@@ -83,6 +84,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
       // O erro será apresentado na seção de contatos.
     }
   }
+
   // ============================================================
   // CARREGAMENTO E CACHE DAS OFERTAS
   // ============================================================
@@ -1438,45 +1440,73 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
         return Column(
           children: products.map((product) {
-            return ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.agriculture)),
-              title: Text(product.name),
-              subtitle: Text(
-                '${product.category} • ${product.unit}\n'
-                '${product.location}',
-              ),
-              isThreeLine: true,
-              trailing: SizedBox(
-                width: 190,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Flexible(
-                      child: Text(
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  leading: const CircleAvatar(child: Icon(Icons.agriculture)),
+                  title: Text(
+                    product.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 2),
+                      Text(
+                        '${product.category} • ${product.unit}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (product.location.trim().isNotEmpty)
+                        Text(
+                          product.location,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
                         _formatPrice(product.price),
+                        softWrap: false,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
+                          fontSize: 15,
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Editar oferta',
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () {
-                        _showOfferDialog(product: product);
-                      },
-                    ),
-                    IconButton(
-                      tooltip: 'Excluir oferta',
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () {
-                        _deleteOffer(product);
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
+                  isThreeLine: true,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Editar oferta',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () {
+                          _showOfferDialog(product: product);
+                        },
+                      ),
+                      IconButton(
+                        tooltip: 'Excluir oferta',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        onPressed: () {
+                          _deleteOffer(product);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const Divider(height: 1),
+              ],
             );
           }).toList(),
         );
