@@ -6,7 +6,7 @@ O AgroMarkt é uma plataforma desenvolvida para facilitar a pesquisa, comparaç�
 
 ## Acesse o sistema
 
-Aplicação online:** https://agromarkt-web.onrender.com/
+Aplicação online: https://agromarkt-web.onrender.com/
 
 Acesse pelo navegador, tanto no computador quanto no celular.
 
